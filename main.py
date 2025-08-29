@@ -11,11 +11,12 @@ ALLOWED_TYPES = ['png', 'jpeg', 'heif', 'heic']
 
 EMOJI_DIR = "./emojis"
 
-
+fonts = ["./fonts/papyrus.ttf", "./fonts/comic-sans.ttf", "./fonts/fancy.ttf", "./fonts/roboto.ttf"]
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
 
 def ghostify(im: Image.Image, ghostpacify, ghostshit) -> Image.Image:
     im = im.convert("RGBA")
@@ -34,6 +35,7 @@ def ghostify(im: Image.Image, ghostpacify, ghostshit) -> Image.Image:
     layer.paste(ghost, (dx, dy), ghost)
 
     return (Image.alpha_composite(im, layer)).convert('RGB')
+
 
 def deep_fry(im: Image.Image, loops, quality, subsample, posterizebits) -> Image.Image:
     im = im.convert("RGB")
@@ -55,7 +57,6 @@ def deep_fry(im: Image.Image, loops, quality, subsample, posterizebits) -> Image
 
     im = im.resize(new_size, resample=Image.BOX)
 
-
     ## make color tiktok ###############
 
     if posterizebits:
@@ -75,20 +76,26 @@ def deep_fry(im: Image.Image, loops, quality, subsample, posterizebits) -> Image
 
     return im
 
-def draw_text(im: Image.Image, text: str, font: str, size: int, xy=(0, 0),fill=(255, 255, 255, 255), max_width=None) -> Image.Image:
+
+def draw_text(im: Image.Image, text: str, font: int, size: int, xy=(0, 0), fill=(255, 255, 255, 255),
+              max_width=None) -> Image.Image:
     im = im.convert("RGBA")
 
     draw = ImageDraw.Draw(im)
     x0, y0 = xy
     x, y = xy
 
+    font = fonts[font - 1]
+
     font = ImageFont.truetype(font, size)
 
     ascent, descent = font.getmetrics()
-    line_h = int(ascent + descent) * 1.1
-    emoji_h = 1
+    line_h = int((ascent + descent) * 1.1)
+    emoji_h = int(ascent)
 
-    index=0
+    max_width = im.size[0]
+
+    index = 0
     emojipos = []
 
     draw = ImageDraw.Draw(im)
@@ -98,34 +105,54 @@ def draw_text(im: Image.Image, text: str, font: str, size: int, xy=(0, 0),fill=(
             index += 1
             continue
 
-        if part+".png" in os.listdir(EMOJI_DIR):
+        if part + ".png" in os.listdir(EMOJI_DIR):
             emojipos.append(index)
             print("Emoji: " + part)
 
-            emoji = Image.open(os.path.join(EMOJI_DIR, part+".png")).convert("RGBA")
+            emoji = Image.open(os.path.join(EMOJI_DIR, part + ".png")).convert("RGBA")
             eh = emoji.size[1]
             ew = emoji.size[0]
-            emoji = emoji.resize((int(ew * (emoji_h / eh)), emoji_h), resample=Image.LANCZOS)
 
-            if max_width and x + emoji.size[0] > x0 + max_width:
-                x = x0
-                y += line_h
+            new_w = max(1, int(ew * (emoji_h / eh)))
+            new_h = max(1, int(emoji_h))
 
-            im.paste(emoji, (x, y), emoji)
+            emoji = emoji.resize((new_w, new_h), resample=Image.LANCZOS)
+
+            # im.paste(emoji, (x, y), emoji)
+            # im.paste(emoji, (int(x), int(y)), emoji)
+            im.paste(emoji, (int(x), int(y)), emoji)
             x += emoji.size[0]
         else:
-            draw.text((x, y), part, fill=fill, font=font)
-            x += draw.textlength(part, font=font)
+            length = int(draw.textlength(part, font=font))
+            print(f"Text: {part} length={length} x={x} y={y}")
+
+            if length > max_width:
+                for char in part:
+                    print(char)
+                    char_length = int(draw.textlength(char, font=font))
+                    if max_width and x + char_length > x0 + max_width:
+                        print(f"Character too long: {char} x={x0} y={y}")
+                        x = x0
+                        y += line_h
+                    # draw.text((x, y), char, fill=fill, font=font)
+                    draw.text((int(x), int(y)), char, fill=fill, font=font)
+                    x += char_length
+            else:
+                # draw.text((x, y), part, fill=fill, font=font)
+                draw.text((int(x), int(y)), part, fill=fill, font=font)  # be safe
+                x += draw.textlength(part, font=font)
+
             print(part)
 
         index += 1
 
-
     return im.convert("RGB")
+
 
 @app.route("/")
 def hello_world():
     return "<p>Hello, World!</p>"
+
 
 # def allowed_file(filename: str) -> bool:
 #     if '.' not in filename:
@@ -155,11 +182,17 @@ def upload_file():
     quality = request.form.get('quality', default=20, type=int)
     loops = request.form.get('loops', default=3, type=int)
     subsample = request.form.get('subsample', default=2, type=int)
+
     posterizebits = request.form.get('posterizebits', default="true", type=str).lower() == "true"
+
     brightness = request.form.get('brightness', default=1, type=float)
+    contrast = request.form.get('contrast', default=1, type=float)
+
     ghost = request.form.get('ghost', default="true", type=str).lower() == "true"
     ghostpacify = request.form.get('ghostpacify', default=0.5, type=float)
     ghostshit = request.form.get('ghostshit', default=10, type=int)
+
+    font = request.form.get('font', default=1, type=int)
 
     r = int(request.form.get('r', default=255, type=int))
     g = int(request.form.get('g', default=255, type=int))
@@ -175,19 +208,21 @@ def upload_file():
     save_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     file.save(save_path)
 
-
     with Image.open(save_path) as im:
         im = ImageEnhance.Brightness(im).enhance(brightness)
+        im = ImageEnhance.Contrast(im).enhance(contrast)
 
         # font = ImageFont.truetype("./fonts/papyrus.ttf", im.size[1] // 8)
 
         # draw = ImageDraw.Draw(im)
         # draw.text((1,1), "Hello,  My Goat", font=font, fill=(r,g,b, alpha))
 
-        im = draw_text(im, message, "./fonts/papyrus.ttf", im.size[1] // 8)
+        im = draw_text(im, message, font, im.size[1] // 8, fill=(r, g, b, alpha))
         im = deep_fry(im, loops=loops, quality=quality, subsample=subsample, posterizebits=posterizebits)
-        im = ghostify(im, ghostpacify=ghostpacify, ghostshit=ghostshit)
 
-        im.save(save_path,     "JPEG")
+        if ghost:
+            im = ghostify(im, ghostpacify=ghostpacify, ghostshit=ghostshit)
+
+        im.save(save_path, "JPEG")
 
     return {"ok": True, "filename": filename, "path": save_path}, 201
