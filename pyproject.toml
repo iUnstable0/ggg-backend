@@ -3,4 +3,10 @@ name = "ggg-backend"
 version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "flask>=3.1.2",
+    "pillow>=11.3.0",
+    "pilmoji>=2.0.4",
+    "requests>=2.32.5",
+    "werkzeug>=3.1.3",
+]
