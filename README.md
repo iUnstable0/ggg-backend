@@ -1,3 +1,8 @@
+THIS REPO IS THE FRONTEND
+FOR FRONTEND CHECK ggg REPO
+https://github.com/iUnstable0/ggg
+
+
 # ggg-backend
 
 To install dependencies:
