@@ -28,18 +28,18 @@ EMOJI_DIR = "./emojis"
 fonts = ["./fonts/papyrus.ttf", "./fonts/comic-sans.ttf", "./fonts/fancy.ttf", "./fonts/roboto.ttf"]
 # app = Flask(__name__)
 origins = [
-    "http://localhost:3000"
+	"http://localhost:3000",
+	"https://ggg.iustb0.fun"
 ]
-
 
 app = FastAPI()
 
 app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+	CORSMiddleware,
+	allow_origins=origins,
+	allow_credentials=True,
+	allow_methods=["*"],
+	allow_headers=["*"],
 )
 
 
@@ -190,8 +190,10 @@ def hello_world():
 
 app.mount("/files", StaticFiles(directory="files"), name="files")
 
+
 class File(BaseModel):
 	name: str
+
 
 @app.post("/delete")
 def delete_file(
@@ -216,6 +218,7 @@ def delete_file(
 	return JSONResponse(status_code=200, content={
 		"ok": True
 	})
+
 
 @app.post('/upload')
 def upload_file(
@@ -242,7 +245,7 @@ def upload_file(
 
 	if mimetype.split('/')[1] not in ALLOWED_TYPES:
 		raise HTTPException(status_code=400, detail="Unsupported file type")
-		# return {"error": f"Unsupported file type. Allowed: {', '.join(ALLOWED_TYPES)}"}, 400
+	# return {"error": f"Unsupported file type. Allowed: {', '.join(ALLOWED_TYPES)}"}, 400
 	else:
 		print("supported")
 
