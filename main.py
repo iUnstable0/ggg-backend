@@ -4,11 +4,10 @@ import random
 import shutil
 # from flask import Flask, flash, request, redirect, url_for, make_response
 from pathlib import Path
-from typing import Union, Annotated, Optional
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from fastapi.staticfiles import StaticFiles
 import uuid
 
 from werkzeug.utils import secure_filename
@@ -188,6 +187,7 @@ def hello_world():
 #     ext = filename.rsplit('.', 1)[1].lower()
 #     return ext in ALLOWED_TYPES
 
+app.mount("/files", StaticFiles(directory="files"), name="files")
 
 @app.post('/upload')
 def upload_file(
