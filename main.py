@@ -278,7 +278,8 @@ def upload_file(
 
 	name = secure_filename(file.filename)
 
-	filename = f"{name.split(".").pop(0)}-{uuid.uuid4()}"
+	# filename = f"{name.split(".").pop(0)}-{uuid.uuid4()}"
+	filename = uuid.uuid4()
 
 	in_path = UPLOAD_FOLDER / f"{filename}.temp"
 	out_path = UPLOAD_FOLDER / f"{filename}.jpg"
