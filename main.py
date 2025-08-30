@@ -8,6 +8,7 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 import uuid
 
 from werkzeug.utils import secure_filename
@@ -189,6 +190,33 @@ def hello_world():
 
 app.mount("/files", StaticFiles(directory="files"), name="files")
 
+class File(BaseModel):
+	name: str
+
+@app.post("/delete")
+def delete_file(
+		file: File
+):
+	# if not file:
+	# 	raise HTTPException(status_code=400, detail="No filename provided")
+
+	name = secure_filename(file.name)
+	path = UPLOAD_FOLDER / name
+
+	print(path.exists())
+
+	if not path.exists():
+		raise HTTPException(status_code=400, detail="File not found")
+
+	try:
+		path.unlink(missing_ok=True)
+	except:
+		pass
+
+	return JSONResponse(status_code=200, content={
+		"ok": True
+	})
+
 @app.post('/upload')
 def upload_file(
 		file: UploadFile,
@@ -245,9 +273,9 @@ def upload_file(
 
 	print(file.filename)
 
-	filename = f"{file.filename.split(".").pop(0)}-{uuid.uuid4()}"
-	extension = f".{file.filename.split(".").pop()}"
-	savename = secure_filename(filename)
+	name = secure_filename(file.filename)
+
+	filename = f"{name.split(".").pop(0)}-{uuid.uuid4()}"
 
 	in_path = UPLOAD_FOLDER / f"{filename}.temp"
 	out_path = UPLOAD_FOLDER / f"{filename}.jpg"
