@@ -6,12 +6,17 @@ import shutil
 from pathlib import Path
 from typing import Union, Annotated, Optional
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+import uuid
 
 from werkzeug.utils import secure_filename
 
 from PIL import Image, ImageFont, ImageDraw, ImageFilter, ImageOps, ImageEnhance
+import pillow_heif
+
+pillow_heif.register_heif_opener()
 
 UPLOAD_FOLDER = Path("./files")
 UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
@@ -22,7 +27,22 @@ EMOJI_DIR = "./emojis"
 
 fonts = ["./fonts/papyrus.ttf", "./fonts/comic-sans.ttf", "./fonts/fancy.ttf", "./fonts/roboto.ttf"]
 # app = Flask(__name__)
+origins = [
+    "http://localhost:3000"
+]
+
+
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 # app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 
@@ -159,7 +179,7 @@ def draw_text(im: Image.Image, text: str, font: int, size: int, xy=(0, 0), fill=
 
 @app.get("/")
 def hello_world():
-	return "<p>Hello, World!</p>"
+	return JSONResponse(status_code=200, content={"hello": "world"})
 
 
 # def allowed_file(filename: str) -> bool:
@@ -168,60 +188,35 @@ def hello_world():
 #     ext = filename.rsplit('.', 1)[1].lower()
 #     return ext in ALLOWED_TYPES
 
-class FormData(BaseModel):
-	file: UploadFile
-	quality: int = 20
-	loops: int = 3
-	subsample: int = 2
-	posterizebits: bool = True
-	brightness: float = 1.0
-	contrast: float = 1.0
-	ghost: bool = True
-	ghostpacify: float = 0.5
-	ghostshit: int = 10
-	font: int = 1
-	r: int = 255
-	g: int = 255
-	b: int = 255
-	alpha: int = 255
-	message: str = "Hello,  My Goat ❤️"
-
 
 @app.post('/upload')
-def upload_file(request: Annotated[FormData, Form()]):
-	# print("GOAT GOAT GOAT LLOOG" + request.file)
-	if not request.file:
-		return {"error": "No file part in request (expect key 'file')"}, 400
-
-	file = request.file
-
-	if file.filename == '':
-		return {"error": "No selected file"}, 400
-
+def upload_file(
+		file: UploadFile,
+		quality: int = Form(20),
+		loops: int = Form(3),
+		subsample: int = Form(2),
+		posterizebits: bool = Form(True),
+		brightness: float = Form(1.0),
+		contrast: float = Form(1.0),
+		ghost: bool = Form(True),
+		ghostpacify: float = Form(0.5),
+		ghostshit: int = Form(10),
+		font: int = Form(1),
+		r: int = Form(255),
+		g: int = Form(255),
+		b: int = Form(255),
+		alpha: int = Form(255),
+		message: str = Form("Hello,  My Goat ❤️")
+):
 	mimetype = file.content_type
 
 	print(mimetype)
 
 	if mimetype.split('/')[1] not in ALLOWED_TYPES:
-		return {"error": f"Unsupported file type. Allowed: {', '.join(ALLOWED_TYPES)}"}, 400
+		raise HTTPException(status_code=400, detail="Unsupported file type")
+		# return {"error": f"Unsupported file type. Allowed: {', '.join(ALLOWED_TYPES)}"}, 400
 	else:
 		print("supported")
-
-	quality = request.quality
-	loops = request.loops
-	subsample = request.subsample
-	posterizebits = request.posterizebits
-	brightness = request.brightness
-	contrast = request.contrast
-	ghost = request.ghost
-	ghostpacify = request.ghostpacify
-	ghostshit = request.ghostshit
-	font = request.font
-	r = request.r
-	g = request.g
-	b = request.b
-	alpha = request.alpha
-	message = request.message
 
 	# quality = request.form.get('quality', default=20, type=int)
 	# loops = request.form.get('loops', default=3, type=int)
@@ -245,29 +240,45 @@ def upload_file(request: Annotated[FormData, Form()]):
 	#
 	# message = request.form.get('message', default="Hello,  My Goat ❤️", type=str)
 
-	print(quality, loops, subsample, posterizebits)
+	# print(quality, loops, subsample, posterizebits)
 	# return {"error": "Testing"}, 400
 
-	filename = secure_filename(file.filename)
+	print(file.filename)
 
-	save_path = os.path.join(UPLOAD_FOLDER, filename)
-	file.save(save_path)
+	filename = f"{file.filename.split(".").pop(0)}-{uuid.uuid4()}"
+	extension = f".{file.filename.split(".").pop()}"
+	savename = secure_filename(filename)
 
-	with Image.open(save_path) as im:
-		im = ImageEnhance.Brightness(im).enhance(brightness)
-		im = ImageEnhance.Contrast(im).enhance(contrast)
+	in_path = UPLOAD_FOLDER / f"{filename}.temp"
+	out_path = UPLOAD_FOLDER / f"{filename}.jpg"
 
-		# font = ImageFont.truetype("./fonts/papyrus.ttf", im.size[1] // 8)
+	with in_path.open("wb") as out:
+		shutil.copyfileobj(file.file, out)
 
-		# draw = ImageDraw.Draw(im)
-		# draw.text((1,1), "Hello,  My Goat", font=font, fill=(r,g,b, alpha))
+	try:
+		with Image.open(in_path) as im:
+			im = ImageEnhance.Brightness(im).enhance(brightness)
+			im = ImageEnhance.Contrast(im).enhance(contrast)
 
-		im = draw_text(im, message, font, im.size[1] // 8, fill=(r, g, b, alpha))
-		im = deep_fry(im, loops=loops, quality=quality, subsample=subsample, posterizebits=posterizebits)
+			# font = ImageFont.truetype("./fonts/papyrus.ttf", im.size[1] // 8)
 
-		if ghost:
-			im = ghostify(im, ghostpacify=ghostpacify, ghostshit=ghostshit)
+			# draw = ImageDraw.Draw(im)
+			# draw.text((1,1), "Hello,  My Goat", font=font, fill=(r,g,b, alpha))
 
-		im.save(save_path, "JPEG")
+			im = draw_text(im, message, font, im.size[1] // 8, fill=(r, g, b, alpha))
+			im = deep_fry(im, loops=loops, quality=quality, subsample=subsample, posterizebits=posterizebits)
 
-	return {"ok": True, "filename": filename, "path": save_path}, 201
+			if ghost:
+				im = ghostify(im, ghostpacify=ghostpacify, ghostshit=ghostshit)
+
+			im.convert("RGB").save(out_path, "JPEG")
+	except Exception as e:
+		print(e)
+		raise HTTPException(status_code=500, detail="Failed to process image")
+	finally:
+		try:
+			in_path.unlink(missing_ok=True)
+		except:
+			pass
+
+	return JSONResponse(status_code=201, content={"ok": True, "filename": out_path.name})
