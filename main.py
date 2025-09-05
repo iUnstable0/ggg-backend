@@ -2,6 +2,8 @@ import os
 from io import BytesIO
 import random
 import shutil
+import schedule
+import time
 # from flask import Flask, flash, request, redirect, url_for, make_response
 from pathlib import Path
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
@@ -9,6 +11,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from contextlib import asynccontextmanager
+import threading
 import uuid
 
 from werkzeug.utils import secure_filename
@@ -32,7 +36,50 @@ origins = [
 	"https://ggg.iustb0.fun"
 ]
 
-app = FastAPI()
+
+def cleanup():
+	print("cleaning files")
+
+	now = time.time()
+
+	try :
+		for file in UPLOAD_FOLDER.iterdir():
+			if file.is_file() and file.name != "dot":
+				try:
+					modifiedTime = file.stat().st_mtime
+					age = now - modifiedTime
+
+					#5 mins
+					if age > 300:
+						print(f"Deleting old file: {file.name}")
+						file.unlink(missing_ok=True)
+				except Exception as e:
+					print(e)
+	except Exception as e:
+		print(e)
+
+	print("cleanup done")
+
+
+def scheduler():
+	cleanup()
+
+	schedule.every(1).minutes.do(cleanup)
+
+	while True:
+		schedule.run_pending()
+		time.sleep(1)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+	print("Starting app")
+
+	scheduler_thread = threading.Thread(target=scheduler, daemon=True)
+	scheduler_thread.start()
+
+	yield
+	print("Exiting!")
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
 	CORSMiddleware,
