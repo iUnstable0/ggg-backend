@@ -193,6 +193,12 @@ def draw_text(im: Image.Image, text: str, font: int, size: int, xy=(0, 0), fill=
 
 			# im.paste(emoji, (x, y), emoji)
 			# im.paste(emoji, (int(x), int(y)), emoji)
+
+			if x + new_w > x0 + max_width:
+				print("much much mucho")
+				x = x0
+				y += line_h
+
 			im.paste(emoji, (int(x), int(y)), emoji)
 			x += emoji.size[0]
 		else:
@@ -203,7 +209,7 @@ def draw_text(im: Image.Image, text: str, font: int, size: int, xy=(0, 0), fill=
 				for char in part:
 					print(char)
 					char_length = int(draw.textlength(char, font=font))
-					if max_width and x + char_length > x0 + max_width:
+					if x + char_length > x0 + max_width:
 						print(f"Character too long: {char} x={x0} y={y}")
 						x = x0
 						y += line_h
@@ -267,6 +273,7 @@ def delete_file(
 
 @app.post('/upload')
 def upload_file(
+
 		file: UploadFile,
 		quality: int = Form(20),
 		loops: int = Form(3),
@@ -334,6 +341,8 @@ def upload_file(
 
 	try:
 		with Image.open(in_path) as im:
+			im = ImageOps.exif_transpose(im)
+
 			im = ImageEnhance.Brightness(im).enhance(brightness)
 			im = ImageEnhance.Contrast(im).enhance(contrast)
 
