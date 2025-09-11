@@ -38,7 +38,7 @@ origins = [
 
 
 def cleanup():
-	print("cleaning files")
+	# print("cleaning files")
 
 	now = time.time()
 
@@ -58,7 +58,7 @@ def cleanup():
 	except Exception as e:
 		print(e)
 
-	print("cleanup done")
+	# print("cleanup done")
 
 
 def scheduler():
@@ -89,9 +89,7 @@ app.add_middleware(
 	allow_headers=["*"],
 )
 
-
 # app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
 
 def ghostify(im: Image.Image, ghostpacify, ghostshit) -> Image.Image:
 	im = im.convert("RGBA")
