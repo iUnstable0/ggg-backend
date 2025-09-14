@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
+from moviepy import VideoFileClip, TextClip, CompositeVideoClip
 import threading
 import uuid
 
