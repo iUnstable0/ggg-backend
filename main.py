@@ -26,7 +26,8 @@ pillow_heif.register_heif_opener()
 UPLOAD_FOLDER = Path("./files")
 UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 
-ALLOWED_TYPES = ['png', 'jpeg', 'heif', 'heic']
+ALLOWED_IMAGES_TYPES = ['png', 'jpeg', 'heif', 'heic']
+ALLOWED_VIDEO_TYPES = ['mp4', 'mov', 'webm', 'avi']
 
 EMOJI_DIR = "./emojis"
 
@@ -271,9 +272,14 @@ def delete_file(
 		"ok": True
 	})
 
+@app.post("/upload-video")
+# def upload_videop(
+# 		file: UploadFile,
+#
+# )
 
 @app.post('/upload')
-def upload_file(
+def upload_image(
 
 		file: UploadFile,
 		quality: int = Form(20),
@@ -296,7 +302,7 @@ def upload_file(
 
 	print(mimetype)
 
-	if mimetype.split('/')[1] not in ALLOWED_TYPES:
+	if mimetype.split('/')[1] not in ALLOWED_IMAGES_TYPES:
 		raise HTTPException(status_code=400, detail="Unsupported file type")
 	# return {"error": f"Unsupported file type. Allowed: {', '.join(ALLOWED_TYPES)}"}, 400
 	else:
