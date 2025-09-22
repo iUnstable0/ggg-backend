@@ -27,7 +27,7 @@ UPLOAD_FOLDER = Path("./files")
 UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 
 ALLOWED_IMAGES_TYPES = ['png', 'jpeg', 'heif', 'heic']
-ALLOWED_VIDEO_TYPES = ['mp4', 'mov', 'webm', 'avi']
+ALLOWED_VIDEO_TYPES = ['mp4', 'mov', 'webm', 'avi', "quicktime"]
 
 EMOJI_DIR = "./emojis"
 
@@ -119,7 +119,7 @@ def deep_fry(im: Image.Image, loops, quality, subsample, posterizebits) -> Image
 
 	w, h = im.size
 
-	im = im.resize((max(1, w // 4), max(1, h // 4)), resample=Image.BOX)
+	im = im.resize((max(1, w // 2), max(1, h // 2)), resample=Image.BOX)
 
 	## make it look rlly stretched ###############
 
@@ -273,14 +273,100 @@ def delete_file(
 	})
 
 @app.post("/upload-video")
-# def upload_videop(
-# 		file: UploadFile,
-#
-# )
+def upload_videop(
+		file: UploadFile,
+		quality: int = Form(20),
+		loops: int = Form(3),
+		subsample: int = Form(2),
+		posterizebits: bool = Form(True),
+		brightness: float = Form(1.0),
+		contrast: float = Form(1.0),
+		ghost: bool = Form(True),
+		ghostpacify: float = Form(0.5),
+		ghostshit: int = Form(10),
+		fps: int = Form(10),
+		font: int = Form(1),
+		r: int = Form(255),
+		g: int = Form(255),
+		b: int = Form(255),
+		alpha: int = Form(255),
+		message: str = Form("Hello,  My Goat ❤️")
+):
+	mimetype = file.content_type
 
+	print(mimetype)
+
+	if not mimetype.startswith("video/"):
+		raise HTTPException(status_code=400, detail="Unsupported file type")
+
+	if mimetype.split('/')[1] not in ALLOWED_VIDEO_TYPES:
+		raise HTTPException(status_code=400, detail="Unsupported file type")
+	# return {"error": f"Unsupported file type. Allowed: {', '.join(ALLOWED_TYPES)}"}, 400
+	else:
+		print("supported")
+
+	filename = uuid.uuid4()
+
+	in_path = UPLOAD_FOLDER / f"{filename}.temp"
+	out_path = UPLOAD_FOLDER / f"{filename}.gif"
+
+	with in_path.open("wb") as out:
+		shutil.copyfileobj(file.file, out)
+
+	processed_frames = []
+	clip = None
+
+	try:
+		clip = VideoFileClip(str(in_path))
+
+		for frame in clip.iter_frames(fps=fps, dtype="uint8"):
+			max_width = 480
+
+			im = Image.fromarray(frame)
+
+			w, h = im.size
+
+			if w > max_width:
+				new_h = int(h * (max_width / w))
+				im = im.resize((max_width, new_h), resample=Image.LANCZOS)
+
+			im = ImageEnhance.Brightness(im).enhance(brightness)
+			im = ImageEnhance.Contrast(im).enhance(contrast)
+
+			im = draw_text(im, message, font, im.size[1] // 8, fill=(r, g, b, alpha))
+			im = deep_fry(im, loops=loops, quality=quality, subsample=subsample, posterizebits=posterizebits)
+
+			if ghost:
+				im = ghostify(im, ghostpacify=ghostpacify, ghostshit=ghostshit)
+
+			processed_frames.append(im)
+
+		if not processed_frames:
+			raise HTTPException(status_code=500, detail="Failed to process video no frames")
+
+		duration_ms = int(1000 / fps)
+		processed_frames[0].save(
+			out_path,
+			save_all=True,
+			append_images=processed_frames[1:],
+			duration=duration_ms,
+			loop=0
+		)
+
+	except Exception as e:
+		print(e)
+		raise HTTPException(status_code=500, detail="Failed to process video")
+	finally:
+		if clip:
+			clip.close()
+		try:
+			in_path.unlink(missing_ok=True)
+		except:
+			pass
+
+	return JSONResponse(status_code=201, content={"ok": True, "filename": out_path.name})
 @app.post('/upload')
 def upload_image(
-
 		file: UploadFile,
 		quality: int = Form(20),
 		loops: int = Form(3),
@@ -301,6 +387,10 @@ def upload_image(
 	mimetype = file.content_type
 
 	print(mimetype)
+
+
+	if not mimetype.startswith("image/"):
+		raise HTTPException(status_code=400, detail="Unsupported file type")
 
 	if mimetype.split('/')[1] not in ALLOWED_IMAGES_TYPES:
 		raise HTTPException(status_code=400, detail="Unsupported file type")
