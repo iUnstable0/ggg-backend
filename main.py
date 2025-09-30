@@ -117,9 +117,9 @@ def deep_fry(im: Image.Image, loops, quality, subsample, posterizebits) -> Image
 
 	## low res ###############
 
-	w, h = im.size
-
-	im = im.resize((max(1, w // 2), max(1, h // 2)), resample=Image.BOX)
+	# w, h = im.size
+	#
+	# im = im.resize((max(1, w // 2), max(1, h // 2)), resample=Image.BOX)
 
 	## make it look rlly stretched ###############
 
