@@ -145,8 +145,7 @@ def deep_fry(im: Image.Image, loops, quality, subsample, posterizebits) -> Image
 	return im
 
 def draw_text(im: Image.Image, text: str, font: int, size: int, fill=(255, 255, 255, 255),
-              max_width=None, squishText=False, textPlacement: str = "topleft", margin: int = 10, emojiGlows=False) -> Image.Image:
-
+              max_width=None, squishText=False, textPlacement: str = "topleft", margin: int = 10, emojiGlows=False, emojiGlowLevel=50) -> Image.Image:
 	im = im.convert("RGBA")
 
 	draw = ImageDraw.Draw(im)
@@ -160,6 +159,7 @@ def draw_text(im: Image.Image, text: str, font: int, size: int, fill=(255, 255, 
 	min_size = int(size * 0.5)
 
 	final_size = size
+	print(f"final size before squish: {final_size}")
 	font_obj = ImageFont.truetype(font_path, final_size)
 
 	if squishText:
@@ -175,15 +175,26 @@ def draw_text(im: Image.Image, text: str, font: int, size: int, fill=(255, 255, 
 					emoji = Image.open(os.path.join(EMOJI_DIR, part + ".png"))
 					eh, ew = emoji.size
 					new_w = max(1, int(ew * (emoji_h / eh)))
+					print(f"new width: {new_w}")
+
+					if emojiGlows:
+						new_w = int(new_w * 1.5)
+
 					total_width += new_w
 				else:
+					print(f"part: {part}")
 					total_width += draw.textlength(part, font=font_obj)
-			
+
+			print(f"total width: {total_width}")
+
 			if total_width <= max_width:
 				final_size = current_size
+				print(f"final size squished: {final_size}")
 				break
 		else:
 			final_size = min_size
+
+	print(f"final size after squish: {final_size}")
 
 	font_obj = ImageFont.truetype(font_path, final_size)
 	ascent, descent = font_obj.getmetrics()
@@ -255,7 +266,7 @@ def draw_text(im: Image.Image, text: str, font: int, size: int, fill=(255, 255, 
 			emoji = emoji_obj.resize((new_w, new_h), resample=Image.LANCZOS)
 
 			if emojiGlows:
-				emoji = ImageEnhance.Brightness(emoji).enhance(2)
+				emoji = ImageEnhance.Brightness(emoji).enhance(emojiGlowLevel / 4)
 				emoji = emoji.filter(ImageFilter.GaussianBlur(radius=2))
 
 			final_emoji_to_paste = emoji
@@ -265,7 +276,7 @@ def draw_text(im: Image.Image, text: str, font: int, size: int, fill=(255, 255, 
 				glow_size = (int(new_w * 1.5), int(new_h * 1.5))
 				glow_layer = emoji_obj.resize(glow_size, resample=Image.LANCZOS)
 				glow_layer = glow_layer.filter(ImageFilter.GaussianBlur(radius=15))
-				glow_layer = ImageEnhance.Brightness(glow_layer).enhance(10)
+				glow_layer = ImageEnhance.Brightness(glow_layer).enhance(emojiGlowLevel)
 
 				canvas = Image.new('RGBA', glow_size, (0, 0, 0, 0))
 
@@ -312,8 +323,6 @@ class File(BaseModel):
 def delete_file(
 		file: File
 ):
-
-
 	name = secure_filename(file.name)
 	path = UPLOAD_FOLDER / name
 
@@ -359,6 +368,7 @@ def upload_video(
 		font: int = Form(1),
 		textPlacement: str = Form("topleft"),
 		emojiGlows: bool = Form(False),
+		emojiGlowLevel: int = Form(10),
 		r: int = Form(255),
 		g: int = Form(255),
 		b: int = Form(255),
@@ -405,10 +415,10 @@ def upload_video(
 			im = ImageEnhance.Brightness(im).enhance(brightness)
 			im = ImageEnhance.Contrast(im).enhance(contrast)
 
-			im = draw_text(im, message, font, im.size[1] // 8, fill=(r, g, b, alpha), squishText=squishText, textPlacement=textPlacement, emojiGlows=emojiGlows)
+			im = draw_text(im, message, font, im.size[1] // 8, fill=(r, g, b, alpha), squishText=squishText, textPlacement=textPlacement, emojiGlows=emojiGlows, emojiGlowLevel=emojiGlowLevel)
 
 			if madeWithPrincessMode:
-				im = draw_text(im, "Made in princess mode :sparkling-heart:", font, im.size[1] // 16, fill=(r, g, b, alpha), xy=(50, im.size[1] - 100), squishText=squishText, textPlacement=opposite_text_placement(textPlacement), emojiGlows=emojiGlows)
+				im = draw_text(im, "Made in princess mode :sparkling-heart:", font, im.size[1] // 16, fill=(r, g, b, alpha), xy=(50, im.size[1] - 100), squishText=squishText, textPlacement=opposite_text_placement(textPlacement), emojiGlows=emojiGlows, emojiGlowLevel=emojiGlowLevel)
 
 			im = deep_fry(im, loops=loops, quality=quality, subsample=subsample, posterizebits=posterizebits)
 
@@ -458,6 +468,7 @@ def upload_image(
 		font: int = Form(1),
 		textPlacement: str = Form("topleft"),
 		emojiGlows: bool = Form(False),
+		emojiGlowLevel: int = Form(10),
 		r: int = Form(255),
 		g: int = Form(255),
 		b: int = Form(255),
@@ -498,10 +509,11 @@ def upload_image(
 			im = ImageEnhance.Brightness(im).enhance(brightness)
 			im = ImageEnhance.Contrast(im).enhance(contrast)
 
-			im = draw_text(im, message, font, im.size[1] // 8, fill=(r, g, b, alpha), squishText=squishText, textPlacement=textPlacement, emojiGlows=emojiGlows)
+			im = draw_text(im, message, font, im.size[1] // 8, fill=(r, g, b, alpha), squishText=squishText, textPlacement=textPlacement, emojiGlows=emojiGlows, emojiGlowLevel=emojiGlowLevel)
 
 			if madeWithPrincessMode:
-				im = draw_text(im, "Made in princess mode :sparkling-heart:", font, im.size[1] // 16, fill=(r, g, b, alpha), xy=(50, im.size[1] - 150), squishText=squishText, textPlacement=opposite_text_placement(textPlacement), emojiGlows=emojiGlows)
+				print("made with princess mode")
+				im = draw_text(im, "Made in princess mode :sparkling-heart:", font, im.size[1] // 16, fill=(r, g, b, alpha), xy=(50, im.size[1] - 150), squishText=squishText, textPlacement=opposite_text_placement(textPlacement), emojiGlows=emojiGlows, emojiGlowLevel=emojiGlowLevel)
 
 			im = deep_fry(im, loops=loops, quality=quality, subsample=subsample, posterizebits=posterizebits)
 
