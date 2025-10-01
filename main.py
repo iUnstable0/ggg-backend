@@ -121,7 +121,6 @@ def deep_fry(im: Image.Image, loops, quality, subsample, posterizebits) -> Image
 	#
 	# im = im.resize((max(1, w // 2), max(1, h // 2)), resample=Image.BOX)
 
-	## make it look rlly stretched ###############
 
 	w, h = im.size
 
@@ -137,12 +136,6 @@ def deep_fry(im: Image.Image, loops, quality, subsample, posterizebits) -> Image
 	if posterizebits:
 		im = ImageOps.posterize(im, bits=3)
 
-	##############################################
-
-	# im = ImageEnhance.Color(im).enhance(color)
-	# im = ImageEnhance.Contrast(im).enhance(contrast)
-	# im = ImageEnhance.Brightness(im).enhance(brightness)
-
 	for _ in range(loops):
 		buf = BytesIO()
 		im.save(buf, "JPEG", quality=quality, subsampling=subsample, optimize=False, progressive=True)
@@ -153,79 +146,89 @@ def deep_fry(im: Image.Image, loops, quality, subsample, posterizebits) -> Image
 
 
 def draw_text(im: Image.Image, text: str, font: int, size: int, xy=(0, 0), fill=(255, 255, 255, 255),
-              max_width=None) -> Image.Image:
+              max_width=None, squishText=False) -> Image.Image:
 	im = im.convert("RGBA")
 
 	draw = ImageDraw.Draw(im)
 	x0, y0 = xy
-	x, y = xy
 
-	font = fonts[font - 1]
+	if max_width is None:
+		max_width = im.size[0] - x0
 
-	font = ImageFont.truetype(font, size)
+	font_path = fonts[font - 1]
 
-	ascent, descent = font.getmetrics()
+	min_size = int(size * 0.5)
+
+	final_size = size
+	font_obj = ImageFont.truetype(font_path, final_size)
+
+	if squishText:
+		for current_size in range(size, min_size - 1, -1):
+			font_obj = ImageFont.truetype(font_path, current_size)
+			ascent, _ = font_obj.getmetrics()
+			emoji_h = int(ascent)
+
+			total_width = 0
+
+			for part in text.split(":"):
+				if part.strip() and part + ".png" in os.listdir(EMOJI_DIR):
+					emoji = Image.open(os.path.join(EMOJI_DIR, part + ".png"))
+					eh = emoji.size[1]
+					ew = emoji.size[0]
+					new_w = max(1, int(ew * (emoji_h / eh)))
+					total_width += new_w
+				else:
+					total_width += draw.textlength(part, font=font_obj)
+			
+			if total_width <= max_width:
+				final_size = current_size
+				break
+		else:
+			final_size = min_size
+
+	font = ImageFont.truetype(font_path, final_size)
+	ascent, descent = font_obj.getmetrics()
+
 	line_h = int((ascent + descent) * 1.1)
 	emoji_h = int(ascent)
 
-	max_width = im.size[0]
+	x, y = xy
+	space_width = draw.textlength(" ", font=font_obj)
 
-	index = 0
-	emojipos = []
-
-	draw = ImageDraw.Draw(im)
+	words = []
 
 	for part in text.split(":"):
-		if part.strip() == "":
-			index += 1
-			continue
+		if part.strip() and part + ".png" in os.listdir(EMOJI_DIR):
+			words.append(f":{part}:")
+		else:
+			words.extend(part.split())
 
-		if part + ".png" in os.listdir(EMOJI_DIR):
-			emojipos.append(index)
-			print("Emoji: " + part)
-
-			emoji = Image.open(os.path.join(EMOJI_DIR, part + ".png")).convert("RGBA")
+	for word in words:
+		is_emoji = word.startswith(":") and word.endswith(":") and word[1:-1] + ".png" in os.listdir(EMOJI_DIR)
+        
+		if is_emoji:
+			emoji_name = word[1:-1]
+			emoji = Image.open(os.path.join(EMOJI_DIR, emoji_name + ".png")).convert("RGBA")
 			eh = emoji.size[1]
 			ew = emoji.size[0]
-
 			new_w = max(1, int(ew * (emoji_h / eh)))
 			new_h = max(1, int(emoji_h))
-
 			emoji = emoji.resize((new_w, new_h), resample=Image.LANCZOS)
 
-			# im.paste(emoji, (x, y), emoji)
-			# im.paste(emoji, (int(x), int(y)), emoji)
-
 			if x + new_w > x0 + max_width:
-				print("much much mucho")
 				x = x0
 				y += line_h
 
 			im.paste(emoji, (int(x), int(y)), emoji)
-			x += emoji.size[0]
+			x += new_w + space_width
 		else:
-			length = int(draw.textlength(part, font=font))
-			print(f"Text: {part} length={length} x={x} y={y}")
-
-			if length > max_width:
-				for char in part:
-					print(char)
-					char_length = int(draw.textlength(char, font=font))
-					if x + char_length > x0 + max_width:
-						print(f"Character too long: {char} x={x0} y={y}")
-						x = x0
-						y += line_h
-					# draw.text((x, y), char, fill=fill, font=font)
-					draw.text((int(x), int(y)), char, fill=fill, font=font)
-					x += char_length
-			else:
-				# draw.text((x, y), part, fill=fill, font=font)
-				draw.text((int(x), int(y)), part, fill=fill, font=font)  # be safe
-				x += draw.textlength(part, font=font)
-
-			print(part)
-
-		index += 1
+			word_width = draw.textlength(word, font=font_obj)
+			if x + word_width > x0 + max_width:
+				x = x0
+				y += line_h
+            
+			draw.text((int(x), int(y)), word, fill=fill, font=font_obj)
+			x += word_width + space_width
 
 	return im.convert("RGB")
 
@@ -234,12 +237,6 @@ def draw_text(im: Image.Image, text: str, font: int, size: int, xy=(0, 0), fill=
 def hello_world():
 	return JSONResponse(status_code=200, content={"hello": "world"})
 
-
-# def allowed_file(filename: str) -> bool:
-#     if '.' not in filename:
-#         return False
-#     ext = filename.rsplit('.', 1)[1].lower()
-#     return ext in ALLOWED_TYPES
 
 app.mount("/files", StaticFiles(directory="files"), name="files")
 
@@ -252,8 +249,7 @@ class File(BaseModel):
 def delete_file(
 		file: File
 ):
-	# if not file:
-	# 	raise HTTPException(status_code=400, detail="No filename provided")
+
 
 	name = secure_filename(file.name)
 	path = UPLOAD_FOLDER / name
@@ -276,6 +272,7 @@ def delete_file(
 def upload_videop(
 		file: UploadFile,
 		madeWithPrincessMode: bool = Form(False),
+		squishText: bool = Form(False),
 		quality: int = Form(20),
 		loops: int = Form(3),
 		subsample: int = Form(2),
@@ -302,7 +299,6 @@ def upload_videop(
 
 	if mimetype.split('/')[1] not in ALLOWED_VIDEO_TYPES:
 		raise HTTPException(status_code=400, detail="Unsupported file type")
-	# return {"error": f"Unsupported file type. Allowed: {', '.join(ALLOWED_TYPES)}"}, 400
 	else:
 		print("supported")
 
@@ -334,10 +330,10 @@ def upload_videop(
 			im = ImageEnhance.Brightness(im).enhance(brightness)
 			im = ImageEnhance.Contrast(im).enhance(contrast)
 
-			im = draw_text(im, message, font, im.size[1] // 8, fill=(r, g, b, alpha))
+			im = draw_text(im, message, font, im.size[1] // 8, fill=(r, g, b, alpha), squishText=squishText)
 
 			if madeWithPrincessMode:
-				im = draw_text(im, "Made in princess mode :sparkling-heart:", font, im.size[1] // 16, fill=(r, g, b, alpha), xy=(50, im.size[1] - 100))
+				im = draw_text(im, "Made in princess mode :sparkling-heart:", font, im.size[1] // 16, fill=(r, g, b, alpha), xy=(50, im.size[1] - 100), squishText=squishText)
 
 			im = deep_fry(im, loops=loops, quality=quality, subsample=subsample, posterizebits=posterizebits)
 
@@ -374,6 +370,7 @@ def upload_videop(
 def upload_image(
 		file: UploadFile,
 		madeWithPrincessMode: bool = Form(False),
+		squishText: bool = Form(False),
 		quality: int = Form(20),
 		loops: int = Form(3),
 		subsample: int = Form(2),
@@ -400,34 +397,9 @@ def upload_image(
 
 	if mimetype.split('/')[1] not in ALLOWED_IMAGES_TYPES:
 		raise HTTPException(status_code=400, detail="Unsupported file type")
-	# return {"error": f"Unsupported file type. Allowed: {', '.join(ALLOWED_TYPES)}"}, 400
+
 	else:
 		print("supported")
-
-	# quality = request.form.get('quality', default=20, type=int)
-	# loops = request.form.get('loops', default=3, type=int)
-	# subsample = request.form.get('subsample', default=2, type=int)
-	#
-	# posterizebits = request.form.get('posterizebits', default="true", type=str).lower() == "true"
-	#
-	# brightness = request.form.get('brightness', default=1, type=float)
-	# contrast = request.form.get('contrast', default=1, type=float)
-	#
-	# ghost = request.form.get('ghost', default="true", type=str).lower() == "true"
-	# ghostpacify = request.form.get('ghostpacify', default=0.5, type=float)
-	# ghostshit = request.form.get('ghostshit', default=10, type=int)
-	#
-	# font = request.form.get('font', default=1, type=int)
-	#
-	# r = int(request.form.get('r', default=255, type=int))
-	# g = int(request.form.get('g', default=255, type=int))
-	# b = int(request.form.get('b', default=255, type=int))
-	# alpha = int(request.form.get('alpha', default=255, type=int))
-	#
-	# message = request.form.get('message', default="Hello,  My Goat ❤️", type=str)
-
-	# print(quality, loops, subsample, posterizebits)
-	# return {"error": "Testing"}, 400
 
 	print(file.filename)
 
@@ -449,15 +421,10 @@ def upload_image(
 			im = ImageEnhance.Brightness(im).enhance(brightness)
 			im = ImageEnhance.Contrast(im).enhance(contrast)
 
-			# font = ImageFont.truetype("./fonts/papyrus.ttf", im.size[1] // 8)
-
-			# draw = ImageDraw.Draw(im)
-			# draw.text((1,1), "Hello,  My Goat", font=font, fill=(r,g,b, alpha))
-
-			im = draw_text(im, message, font, im.size[1] // 8, fill=(r, g, b, alpha))
+			im = draw_text(im, message, font, im.size[1] // 8, fill=(r, g, b, alpha), squishText=squishText)
 
 			if madeWithPrincessMode:
-				im = draw_text(im, "Made in princess mode :sparkling-heart:", font, im.size[1] // 16, fill=(r, g, b, alpha), xy=(50, im.size[1] - 150))
+				im = draw_text(im, "Made in princess mode :sparkling-heart:", font, im.size[1] // 16, fill=(r, g, b, alpha), xy=(50, im.size[1] - 150), squishText=squishText)
 
 			im = deep_fry(im, loops=loops, quality=quality, subsample=subsample, posterizebits=posterizebits)
 
