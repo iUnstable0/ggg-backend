@@ -275,6 +275,7 @@ def delete_file(
 @app.post("/upload-video")
 def upload_videop(
 		file: UploadFile,
+		madeWithPrincessMode: bool = Form(False),
 		quality: int = Form(20),
 		loops: int = Form(3),
 		subsample: int = Form(2),
@@ -334,6 +335,10 @@ def upload_videop(
 			im = ImageEnhance.Contrast(im).enhance(contrast)
 
 			im = draw_text(im, message, font, im.size[1] // 8, fill=(r, g, b, alpha))
+
+			if madeWithPrincessMode:
+				im = draw_text(im, "Made in princess mode :sparkling-heart:", font, im.size[1] // 16, fill=(r, g, b, alpha), xy=(50, im.size[1] - 100))
+
 			im = deep_fry(im, loops=loops, quality=quality, subsample=subsample, posterizebits=posterizebits)
 
 			if ghost:
@@ -368,6 +373,7 @@ def upload_videop(
 @app.post('/upload')
 def upload_image(
 		file: UploadFile,
+		madeWithPrincessMode: bool = Form(False),
 		quality: int = Form(20),
 		loops: int = Form(3),
 		subsample: int = Form(2),
@@ -449,6 +455,10 @@ def upload_image(
 			# draw.text((1,1), "Hello,  My Goat", font=font, fill=(r,g,b, alpha))
 
 			im = draw_text(im, message, font, im.size[1] // 8, fill=(r, g, b, alpha))
+
+			if madeWithPrincessMode:
+				im = draw_text(im, "Made in princess mode :sparkling-heart:", font, im.size[1] // 16, fill=(r, g, b, alpha), xy=(50, im.size[1] - 150))
+
 			im = deep_fry(im, loops=loops, quality=quality, subsample=subsample, posterizebits=posterizebits)
 
 			if ghost:
