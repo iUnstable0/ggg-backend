@@ -253,8 +253,10 @@ def draw_text(im: Image.Image, text: str, font: int, size: int, fill=(255, 255, 
 			new_w = max(1, int(ew * (emoji_h/ eh)))
 			new_h = max(1, int(emoji_h))
 			emoji = emoji_obj.resize((new_w, new_h), resample=Image.LANCZOS)
-			emoji = ImageEnhance.Brightness(emoji).enhance(2)
-			emoji = emoji.filter(ImageFilter.GaussianBlur(radius=2))
+
+			if emojiGlows:
+				emoji = ImageEnhance.Brightness(emoji).enhance(2)
+				emoji = emoji.filter(ImageFilter.GaussianBlur(radius=2))
 
 			final_emoji_to_paste = emoji
 			word_width = new_w
