@@ -144,16 +144,16 @@ def deep_fry(im: Image.Image, loops, quality, subsample, posterizebits) -> Image
 
 	return im
 
+def draw_text(im: Image.Image, text: str, font: int, size: int, fill=(255, 255, 255, 255),
+              max_width=None, squishText=False, textPlacement: str = "topleft", margin: int = 10) -> Image.Image:
 
-def draw_text(im: Image.Image, text: str, font: int, size: int, xy=(0, 0), fill=(255, 255, 255, 255),
-              max_width=None, squishText=False) -> Image.Image:
 	im = im.convert("RGBA")
 
 	draw = ImageDraw.Draw(im)
-	x0, y0 = xy
+	img_w, img_h = im.size
 
 	if max_width is None:
-		max_width = im.size[0] - x0
+		max_width = img_w - (margin * 2)
 
 	font_path = fonts[font - 1]
 
@@ -173,8 +173,7 @@ def draw_text(im: Image.Image, text: str, font: int, size: int, xy=(0, 0), fill=
 			for part in text.split(":"):
 				if part.strip() and part + ".png" in os.listdir(EMOJI_DIR):
 					emoji = Image.open(os.path.join(EMOJI_DIR, part + ".png"))
-					eh = emoji.size[1]
-					ew = emoji.size[0]
+					eh, ew = emoji.size
 					new_w = max(1, int(ew * (emoji_h / eh)))
 					total_width += new_w
 				else:
@@ -186,13 +185,11 @@ def draw_text(im: Image.Image, text: str, font: int, size: int, xy=(0, 0), fill=
 		else:
 			final_size = min_size
 
-	font = ImageFont.truetype(font_path, final_size)
+	font_obj = ImageFont.truetype(font_path, final_size)
 	ascent, descent = font_obj.getmetrics()
 
 	line_h = int((ascent + descent) * 1.1)
 	emoji_h = int(ascent)
-
-	x, y = xy
 	space_width = draw.textlength(" ", font=font_obj)
 
 	words = []
@@ -203,35 +200,76 @@ def draw_text(im: Image.Image, text: str, font: int, size: int, xy=(0, 0), fill=
 		else:
 			words.extend(part.split())
 
+	current_x = 0
+	current_y = 0
+	max_line_width = 0
+
 	for word in words:
 		is_emoji = word.startswith(":") and word.endswith(":") and word[1:-1] + ".png" in os.listdir(EMOJI_DIR)
         
+		word_width = 0
+		if is_emoji:
+			emoji_name = word[1:-1]
+			emoji = Image.open(os.path.join(EMOJI_DIR, emoji_name + ".png"))
+			eh, ew = emoji.size
+			word_width = max(1, int(ew * (emoji_h / eh)))
+		else:
+			word_width = draw.textlength(word, font=font_obj)
+		
+		if current_x + word_width > max_width:
+			max_line_width = max(max_line_width, current_x)
+			current_x = 0
+			current_y += line_h
+		
+		current_x += word_width + space_width
+	
+	max_line_width = max(max_line_width, current_x - space_width)
+	text_block_width = max_line_width
+	text_block_height = current_y + line_h
+
+	start_x, start_y = 0, 0
+	if textPlacement == "topleft":
+		start_x, start_y = margin, margin
+	elif textPlacement == "topright":
+		start_x, start_y = img_w - text_block_width - margin, margin
+	elif textPlacement == "bottomleft":
+		start_x, start_y = margin, img_h - text_block_height - margin
+	elif textPlacement == "bottomright":
+		start_x, start_y = img_w - text_block_width - margin, img_h - text_block_height - margin
+	elif textPlacement == "center":
+		start_x = (img_w - text_block_width) / 2
+		start_y = (img_h - text_block_height) / 2
+	
+	x, y = start_x, start_y
+
+	for word in words:
+		is_emoji = word.startswith(":") and word.endswith(":") and word[1:-1] + ".png" in os.listdir(EMOJI_DIR)
+
 		if is_emoji:
 			emoji_name = word[1:-1]
 			emoji = Image.open(os.path.join(EMOJI_DIR, emoji_name + ".png")).convert("RGBA")
-			eh = emoji.size[1]
-			ew = emoji.size[0]
-			new_w = max(1, int(ew * (emoji_h / eh)))
+			eh, ew = emoji.size
+			new_w = max(1, int(ew * (emoji_h/ eh)))
 			new_h = max(1, int(emoji_h))
 			emoji = emoji.resize((new_w, new_h), resample=Image.LANCZOS)
 
-			if x + new_w > x0 + max_width:
-				x = x0
+			word_width = new_w
+			if x + word_width > start_x + max_width:
+				x = start_x
 				y += line_h
-
+			
 			im.paste(emoji, (int(x), int(y)), emoji)
-			x += new_w + space_width
+			x += word_width + space_width
 		else:
 			word_width = draw.textlength(word, font=font_obj)
-			if x + word_width > x0 + max_width:
-				x = x0
+			if x + word_width > start_x + max_width:
+				x = start_x
 				y += line_h
-            
+			
 			draw.text((int(x), int(y)), word, fill=fill, font=font_obj)
 			x += word_width + space_width
-
+	
 	return im.convert("RGB")
-
 
 @app.get("/")
 def hello_world():
@@ -268,6 +306,16 @@ def delete_file(
 		"ok": True
 	})
 
+def opposite_text_placement(textPlacement: str) -> str:
+	if textPlacement == "topleft":
+		return "bottomleft"
+	elif textPlacement == "topright":
+		return "bottomleft"
+	elif textPlacement == "bottomleft":
+		return "topleft"
+	elif textPlacement == "bottomright":
+		return "topleft"
+
 @app.post("/upload-video")
 def upload_videop(
 		file: UploadFile,
@@ -284,6 +332,7 @@ def upload_videop(
 		ghostshit: int = Form(10),
 		fps: int = Form(10),
 		font: int = Form(1),
+		textPlacement: str = Form("topleft"),
 		r: int = Form(255),
 		g: int = Form(255),
 		b: int = Form(255),
@@ -330,10 +379,10 @@ def upload_videop(
 			im = ImageEnhance.Brightness(im).enhance(brightness)
 			im = ImageEnhance.Contrast(im).enhance(contrast)
 
-			im = draw_text(im, message, font, im.size[1] // 8, fill=(r, g, b, alpha), squishText=squishText)
+			im = draw_text(im, message, font, im.size[1] // 8, fill=(r, g, b, alpha), squishText=squishText, textPlacement=textPlacement)
 
 			if madeWithPrincessMode:
-				im = draw_text(im, "Made in princess mode :sparkling-heart:", font, im.size[1] // 16, fill=(r, g, b, alpha), xy=(50, im.size[1] - 100), squishText=squishText)
+				im = draw_text(im, "Made in princess mode :sparkling-heart:", font, im.size[1] // 16, fill=(r, g, b, alpha), xy=(50, im.size[1] - 100), squishText=squishText, textPlacement=opposite_text_placement(textPlacement))
 
 			im = deep_fry(im, loops=loops, quality=quality, subsample=subsample, posterizebits=posterizebits)
 
@@ -381,6 +430,7 @@ def upload_image(
 		ghostpacify: float = Form(0.5),
 		ghostshit: int = Form(10),
 		font: int = Form(1),
+		textPlacement: str = Form("topleft"),
 		r: int = Form(255),
 		g: int = Form(255),
 		b: int = Form(255),
@@ -421,10 +471,10 @@ def upload_image(
 			im = ImageEnhance.Brightness(im).enhance(brightness)
 			im = ImageEnhance.Contrast(im).enhance(contrast)
 
-			im = draw_text(im, message, font, im.size[1] // 8, fill=(r, g, b, alpha), squishText=squishText)
+			im = draw_text(im, message, font, im.size[1] // 8, fill=(r, g, b, alpha), squishText=squishText, textPlacement=textPlacement)
 
 			if madeWithPrincessMode:
-				im = draw_text(im, "Made in princess mode :sparkling-heart:", font, im.size[1] // 16, fill=(r, g, b, alpha), xy=(50, im.size[1] - 150), squishText=squishText)
+				im = draw_text(im, "Made in princess mode :sparkling-heart:", font, im.size[1] // 16, fill=(r, g, b, alpha), xy=(50, im.size[1] - 150), squishText=squishText, textPlacement=opposite_text_placement(textPlacement))
 
 			im = deep_fry(im, loops=loops, quality=quality, subsample=subsample, posterizebits=posterizebits)
 
