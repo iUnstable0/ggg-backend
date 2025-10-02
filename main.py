@@ -112,7 +112,7 @@ def ghostify(im: Image.Image, ghostpacify, ghostshit) -> Image.Image:
 	return (Image.alpha_composite(im, layer)).convert('RGB')
 
 
-def deep_fry(im: Image.Image, loops, quality, subsample, posterizebits) -> Image.Image:
+def deep_fry(im: Image.Image, loops, quality, subsample, posterizebits, squishImg) -> Image.Image:
 	im = im.convert("RGB")
 
 	## low res ###############
@@ -122,14 +122,15 @@ def deep_fry(im: Image.Image, loops, quality, subsample, posterizebits) -> Image
 	# im = im.resize((max(1, w // 2), max(1, h // 2)), resample=Image.BOX)
 
 
-	w, h = im.size
+	if squishImg:
+		w, h = im.size
 
-	w_scale = 1.1
-	h_scale = 0.8
+		w_scale = 1.1
+		h_scale = 0.8
 
-	new_size = (max(1, int(w * w_scale)), max(1, int(h * h_scale)))
+		new_size = (max(1, int(w * w_scale)), max(1, int(h * h_scale)))
 
-	im = im.resize(new_size, resample=Image.BOX)
+		im = im.resize(new_size, resample=Image.BOX)
 
 	## make color tiktok ###############
 
@@ -143,6 +144,14 @@ def deep_fry(im: Image.Image, loops, quality, subsample, posterizebits) -> Image
 		im = Image.open(buf).convert("RGB")
 
 	return im
+
+def pinkify_im(im: Image.Image) -> Image.Image:
+	im = im.convert("RGB")
+
+	pink_overlay = Image.new("RGB", im.size, (255, 192, 203))
+	pink_im = Image.blend(im, pink_overlay, alpha=0.7)
+	
+	return pink_im
 
 def draw_text(im: Image.Image, text: str, font: int, size: int, fill=(255, 255, 255, 255),
               max_width=None, squishText=False, textPlacement: str = "topleft", margin: int = 10, emojiGlows=False, emojiGlowLevel=50) -> Image.Image:
@@ -179,7 +188,6 @@ def draw_text(im: Image.Image, text: str, font: int, size: int, fill=(255, 255, 
 
 					if emojiGlows:
 						new_w = int(new_w * 1.5)
-
 					total_width += new_w
 				else:
 					print(f"part: {part}")
@@ -354,7 +362,8 @@ def opposite_text_placement(textPlacement: str) -> str:
 def upload_video(
 		file: UploadFile,
 		madeWithPrincessMode: bool = Form(False),
-		squishText: bool = Form(False),
+		squishText: bool = Form(True),
+		squishImg: bool = Form(True),
 		quality: int = Form(20),
 		loops: int = Form(3),
 		subsample: int = Form(2),
@@ -369,6 +378,7 @@ def upload_video(
 		textPlacement: str = Form("topleft"),
 		emojiGlows: bool = Form(False),
 		emojiGlowLevel: int = Form(10),
+		pinkify: bool = Form(False),
 		r: int = Form(255),
 		g: int = Form(255),
 		b: int = Form(255),
@@ -420,10 +430,13 @@ def upload_video(
 			if madeWithPrincessMode:
 				im = draw_text(im, "Made in princess mode :sparkling-heart:", font, im.size[1] // 16, fill=(r, g, b, alpha), xy=(50, im.size[1] - 100), squishText=squishText, textPlacement=opposite_text_placement(textPlacement), emojiGlows=emojiGlows, emojiGlowLevel=emojiGlowLevel)
 
-			im = deep_fry(im, loops=loops, quality=quality, subsample=subsample, posterizebits=posterizebits)
+			im = deep_fry(im, loops=loops, quality=quality, subsample=subsample, posterizebits=posterizebits, squishImg=squishImg)
 
 			if ghost:
 				im = ghostify(im, ghostpacify=ghostpacify, ghostshit=ghostshit)
+
+			if pinkify:
+				im = pinkify_im(im)
 
 			processed_frames.append(im)
 
@@ -455,7 +468,8 @@ def upload_video(
 def upload_image(
 		file: UploadFile,
 		madeWithPrincessMode: bool = Form(False),
-		squishText: bool = Form(False),
+		squishText: bool = Form(True),
+		squishImg: bool = Form(True),
 		quality: int = Form(20),
 		loops: int = Form(3),
 		subsample: int = Form(2),
@@ -469,6 +483,7 @@ def upload_image(
 		textPlacement: str = Form("topleft"),
 		emojiGlows: bool = Form(False),
 		emojiGlowLevel: int = Form(10),
+		pinkify: bool = Form(False),
 		r: int = Form(255),
 		g: int = Form(255),
 		b: int = Form(255),
@@ -515,10 +530,13 @@ def upload_image(
 				print("made with princess mode")
 				im = draw_text(im, "Made in princess mode :sparkling-heart:", font, im.size[1] // 16, fill=(r, g, b, alpha), xy=(50, im.size[1] - 150), squishText=squishText, textPlacement=opposite_text_placement(textPlacement), emojiGlows=emojiGlows, emojiGlowLevel=emojiGlowLevel)
 
-			im = deep_fry(im, loops=loops, quality=quality, subsample=subsample, posterizebits=posterizebits)
+			im = deep_fry(im, loops=loops, quality=quality, subsample=subsample, posterizebits=posterizebits, squishImg=squishImg)
 
 			if ghost:
 				im = ghostify(im, ghostpacify=ghostpacify, ghostshit=ghostshit)
+
+			if pinkify:
+				im = pinkify_im(im)
 
 			im.convert("RGB").save(out_path, "JPEG")
 	except Exception as e:
