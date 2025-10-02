@@ -428,7 +428,7 @@ def upload_video(
 			im = draw_text(im, message, font, im.size[1] // 8, fill=(r, g, b, alpha), squishText=squishText, textPlacement=textPlacement, emojiGlows=emojiGlows, emojiGlowLevel=emojiGlowLevel)
 
 			if madeWithPrincessMode:
-				im = draw_text(im, "Made in princess mode :sparkling-heart:", font, im.size[1] // 16, fill=(r, g, b, alpha), xy=(50, im.size[1] - 100), squishText=squishText, textPlacement=opposite_text_placement(textPlacement), emojiGlows=emojiGlows, emojiGlowLevel=emojiGlowLevel)
+				im = draw_text(im, "Made in princess mode :sparkling-heart:", font, im.size[1] // 16, fill=(r, g, b, alpha), squishText=squishText, textPlacement=opposite_text_placement(textPlacement), emojiGlows=emojiGlows, emojiGlowLevel=emojiGlowLevel)
 
 			im = deep_fry(im, loops=loops, quality=quality, subsample=subsample, posterizebits=posterizebits, squishImg=squishImg)
 
@@ -528,7 +528,7 @@ def upload_image(
 
 			if madeWithPrincessMode:
 				print("made with princess mode")
-				im = draw_text(im, "Made in princess mode :sparkling-heart:", font, im.size[1] // 16, fill=(r, g, b, alpha), xy=(50, im.size[1] - 150), squishText=squishText, textPlacement=opposite_text_placement(textPlacement), emojiGlows=emojiGlows, emojiGlowLevel=emojiGlowLevel)
+				im = draw_text(im, "Made in princess mode :sparkling-heart:", font, im.size[1] // 16, fill=(r, g, b, alpha), squishText=squishText, textPlacement=opposite_text_placement(textPlacement), emojiGlows=emojiGlows, emojiGlowLevel=emojiGlowLevel)
 
 			im = deep_fry(im, loops=loops, quality=quality, subsample=subsample, posterizebits=posterizebits, squishImg=squishImg)
 
